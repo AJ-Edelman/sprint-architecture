@@ -6,9 +6,11 @@
     "SKILL.md",
     "docs/event-driven-sequencing.md",
     "docs/failure-classes.md",
+    "docs/load-balancer.md",
     "docs/presence-and-chair.md",
     "docs/single-source-of-truth.md",
-    "docs/transport-setup.md"
+    "docs/transport-setup.md",
+    "scripts/balancer-reference.mjs"
   ],
   "history_floor": "2026-07-20T00:00:00Z",
   "pii_allow": []

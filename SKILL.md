@@ -182,7 +182,35 @@ frees up while backlog remains, within whatever cap is in force. When a parked o
 needs to resume, resume it with its context intact rather than starting a fresh one from
 scratch.
 
-## 6. Finish + retro (mandatory)
+## 6. Dynamic seat balancing (spine-aware, replaces a fixed sprint-start seat count)
+
+A seat count picked once at sprint start is a guess that goes stale the moment backlog shape or
+review depth changes. Rebalance continuously instead, against the one thing that actually caps
+throughput: the serialized acceptance spine (checkout → integration → review → test → deploy),
+never the count of agents willing to author. Full pattern, worked evidence, the operator-config
+schema, and a dependency-free reference script:
+[`docs/load-balancer.md`](docs/load-balancer.md) /
+[`scripts/balancer-reference.mjs`](scripts/balancer-reference.mjs). Summarized:
+
+- **Optimize for an empty review queue and continuously verified landings — never for occupied
+  seats.** "All seats busy" isn't a health signal; it can mean the spine is drowning just as
+  easily as it can mean things are going well.
+- **Saturate the spine, never flood it**: WIP caps per role, exclusive file ownership per active
+  seat, continuous (not batched/committee) review, and roughly 4–6 seats as the practical ceiling
+  for any genuinely serial chain — concurrency cannot outrun a dependency chain's slowest link.
+- **Rebalance on events, not a timer**: queue-width change, review-backlog depth change, a seat
+  completing its item (the backfill event from §5), or detected bottleneck (landings stalled
+  behind review while seats sit idle).
+- **The operator sets a maximum ceiling only.** A small, operator-editable config —
+  `{ceiling, spineCapacity, roles: [{task, model, maxSeats, effort}]}` — states per-role model
+  bindings and per-role seat ceilings; the balancer rebalances freely within those bounds and
+  never proposes or invents a ceiling of its own (the same discipline as the "no invented
+  ceilings" law in §4).
+- **On usage-metered providers, the same ceilings are the spend control**: the balancer never
+  runs more concurrent paid seats than the spine can actually absorb, so cost tracks landable
+  throughput rather than however many lanes happen to be idle and willing to generate output.
+
+## 7. Finish + retro (mandatory)
 
 A sprint is finished when every item is landed-and-verified or honest-blocked-with-citation, a
 full verification sweep has run, and one summary has gone back to whoever asked for the

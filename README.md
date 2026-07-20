@@ -179,6 +179,29 @@ ledger) — never because a counter crossed a round number that felt like enough
 
 ---
 
+## Dynamic capacity: the spine-aware load balancer
+
+Seat count isn't set once at sprint start and left alone — it's rebalanced continuously against
+the one thing that actually limits throughput: the serialized acceptance spine (checkout →
+integration → review → test → deploy), not the number of agents willing to author. In one
+production run, a serial acceptance chain sustained roughly **6 verified landings/hour** at **4
+concurrent seats**; widening to **15 lanes against the same chain** dropped throughput to roughly
+**2/hour** — a 3:1 regression from more than tripling seat count, because the extra lanes flooded
+a pipeline sized to absorb about 4–6 concurrent workstreams rather than saturating it.
+
+The balancing law: optimize for an empty review queue and continuously verified landings, never
+for occupied seats; saturate the spine without flooding it (WIP caps, exclusive file ownership,
+continuous rather than batched review); rebalance on every queue-width change, review-backlog
+shift, seat completion, or detected bottleneck; and let the operator set only a maximum ceiling —
+the balancer works freely, and continuously, beneath it. On usage-metered providers the same
+ceilings double as spend control at no extra mechanism.
+
+Full pattern, the operator-editable config schema, and a small dependency-free reference
+implementation: [`docs/load-balancer.md`](docs/load-balancer.md) and
+[`scripts/balancer-reference.mjs`](scripts/balancer-reference.mjs).
+
+---
+
 ## Checks are the definition of done
 
 A backlog item is done when its check passes — not when an agent says it's done, not when a
@@ -268,6 +291,9 @@ A few more short notes cover the remaining pieces of the architecture in more de
 - [`docs/transport-setup.md`](docs/transport-setup.md) — a worked example of running the
   signals-only coordination channel on two hosted platforms at once (Discord and Slack),
   including bot-token posting and threaded deliberations.
+- [`docs/load-balancer.md`](docs/load-balancer.md) — the spine-aware load balancer: why more
+  seats can make throughput worse, the balancing loop, the operator-config schema, and a
+  dependency-free reference implementation ([`scripts/balancer-reference.mjs`](scripts/balancer-reference.mjs)).
 
 ## The retro loop
 
