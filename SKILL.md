@@ -14,7 +14,7 @@ the MODELS you bind to each role are meant to change freely.
 
 Read these from the operator's request; if any is missing and the operator is present, confirm
 in one short line before starting. If running unattended, use the stated defaults and record
-what you chose in the plan document.
+what you chose in the plan document. See §0 for the mandatory once-per-run seat-maximums ask.
 
 - **scope**: the backlog itself, or a pointer to its source (mandatory — no sprint without an
   enumerated scope).
@@ -64,7 +64,23 @@ not a better parser — it was removing the unattended step. The coordinator rea
 every diff itself. This is slower per item and is kept anyway, because the failure class it
 removes (silent, undetected data loss) is categorically worse than the time it costs.
 
-## 0. Before anything
+## 0. Invocation ask: ask once, else default to the invoker's own family
+
+On invocation, before anything else, the driving agent asks the operator exactly one
+question, once per run: "specify seat maximums per role, or use defaults?"
+
+- **Specified** — that config (the schema in §7) governs for the rest of the run.
+- **Defaults** — the crew is drawn from the invoking model's own family (whatever
+  fast/judgment/deliberation-tier siblings that family provides), and the balancer assigns
+  each task a tier by its anticipated complexity: a fast/cheap tier for mechanical work, a
+  stronger tier for review and diagnosis, and the strongest/deliberative tier for design or
+  arbitration calls.
+- The question is asked once per run, never once per batch or per item.
+- Running unattended with no operator to answer: apply the same default rule and record the
+  chosen crew and tier assignments in the plan document, matching the general
+  autonomous-mode discipline in PARAMETERS above.
+
+## 1. Before anything
 
 - State the plan in plain language, visible to whoever is running the sprint, before starting
   work — even if the work itself is read-only to begin with.
@@ -75,7 +91,7 @@ removes (silent, undetected data loss) is categorically worse than the time it c
 - The acceptance bar is the actual job, not the shape of a form — specs should quote the
   feature's real intent, not paraphrase it into something vaguer.
 
-## 1. The plan document (single pane of truth)
+## 2. The plan document (single pane of truth)
 
 One file per sprint, containing:
 
@@ -93,9 +109,9 @@ One file per sprint, containing:
 dependency, or a real precondition nothing can fabricate around — always cited). Faking a pass
 around a genuine block is the worst failure this pattern is built to prevent.
 
-## 2. The sentinel record (single source of truth)
+## 3. The sentinel record (single source of truth)
 
-The plan document (§1) stays authoritative for its own sprint's item-by-item state; that
+The plan document (§2) stays authoritative for its own sprint's item-by-item state; that
 doesn't change. A separate need shows up once a *named, shared fact class* — completed work,
 open blockers, human-action items, deploy receipts, which agents are alive — has to read
 identically across more than one sprint, dashboard, or chat-facing agent at once (multiple
@@ -126,14 +142,14 @@ summarized:
   write-ahead logging, JSON-lines, a managed database with an audit table) — the discipline is
   what matters, not the storage engine.
 
-## 3. The shared channel + the dashboard
+## 4. The shared channel + the dashboard
 
 - The coordination channel carries **signals only** — charter, assignments, receipts, blockers,
   escalations, milestones. Anything longer lives on disk and gets linked, not pasted.
 - **Transport is pluggable.** Prefer a durable, already-adopted channel your team uses; fall back
   to a local/ephemeral one if nothing durable is available. The channel is *never* the only copy
   of the truth and *never* a correctness dependency — the floor keeps functioning if the channel
-  goes down, because the plan document and ledger (or the sentinel record, §2) are what actually
+  goes down, because the plan document and ledger (or the sentinel record, §3) are what actually
   matter. Some teams run the channel on two platforms at once for redundancy and audience reach —
   see [`docs/transport-setup.md`](docs/transport-setup.md) for a worked example (Discord and
   Slack), including bot-token REST posting and threads for deliberations.
@@ -150,7 +166,7 @@ summarized:
   shared channel. Verify it's actually reachable from the vantage point the requester will use
   before reporting that it exists.
 
-## 4. Laws that bind every sprint
+## 5. Laws that bind every sprint
 
 - **No time-based anything.** Sequence on completion events, not schedules. Retry backoff is
   short and bounded, used only as an event-detection mechanism — never a scheduling primitive.
@@ -174,7 +190,7 @@ summarized:
   rate-limited capacity for judgment calls; send volume/mechanical work to fixed-cost or
   high-throughput seats.
 
-## 5. Sequencing and scaling
+## 6. Sequencing and scaling
 
 Fan out everything independent, in parallel, immediately. Chain dependent phases on
 **completion events** from the phase before them — never on a schedule. Backfill any seat that
@@ -182,7 +198,7 @@ frees up while backlog remains, within whatever cap is in force. When a parked o
 needs to resume, resume it with its context intact rather than starting a fresh one from
 scratch.
 
-## 6. Dynamic seat balancing (spine-aware, replaces a fixed sprint-start seat count)
+## 7. Dynamic seat balancing (spine-aware, replaces a fixed sprint-start seat count)
 
 A seat count picked once at sprint start is a guess that goes stale the moment backlog shape or
 review depth changes. Rebalance continuously instead, against the one thing that actually caps
@@ -199,18 +215,20 @@ schema, and a dependency-free reference script:
   seat, continuous (not batched/committee) review, and roughly 4–6 seats as the practical ceiling
   for any genuinely serial chain — concurrency cannot outrun a dependency chain's slowest link.
 - **Rebalance on events, not a timer**: queue-width change, review-backlog depth change, a seat
-  completing its item (the backfill event from §5), or detected bottleneck (landings stalled
+  completing its item (the backfill event from §6), or detected bottleneck (landings stalled
   behind review while seats sit idle).
 - **The operator sets a maximum ceiling only.** A small, operator-editable config —
   `{ceiling, spineCapacity, roles: [{task, model, maxSeats, effort}]}` — states per-role model
   bindings and per-role seat ceilings; the balancer rebalances freely within those bounds and
   never proposes or invents a ceiling of its own (the same discipline as the "no invented
-  ceilings" law in §4).
+  ceilings" law in §5). This is the config the §0 invocation ask either receives from the
+  operator or, absent an answer, fills from the invoking model's own family with tiers
+  assigned by anticipated task complexity.
 - **On usage-metered providers, the same ceilings are the spend control**: the balancer never
   runs more concurrent paid seats than the spine can actually absorb, so cost tracks landable
   throughput rather than however many lanes happen to be idle and willing to generate output.
 
-## 7. Finish + retro (mandatory)
+## 8. Finish + retro (mandatory)
 
 A sprint is finished when every item is landed-and-verified or honest-blocked-with-citation, a
 full verification sweep has run, and one summary has gone back to whoever asked for the

@@ -85,6 +85,28 @@ The loop above runs whenever one of these fires — never on a fixed timer:
 - **Bottleneck detection** — landings stall behind review even though seats sit idle: a direct
   signal that spine headroom, not seat count, is the live constraint.
 
+## Invocation: ask once, else default to the invoker's own family
+
+The config below doesn't have to be supplied up front. On invocation, before anything else, the
+driving agent asks the operator exactly one question, once per run: **"specify seat maximums per
+role, or use defaults?"**
+
+- **Operator specifies** — the config in the next section governs for the rest of the run.
+- **Operator doesn't specify (defaults)** — the crew is drawn from the invoking model's own
+  family: whatever fast/judgment/deliberation-tier siblings that model family provides. The
+  balancer then assigns each task a tier by its anticipated complexity — a fast/cheap tier for
+  mechanical work, a stronger tier for review and diagnosis, and the strongest, most deliberative
+  tier for design or arbitration calls that need it.
+- The question is asked once per run, never once per batch or once per item — re-asking
+  mid-run is its own kind of noise.
+- Running unattended, with no operator available to answer: apply the same default rule
+  automatically and record the chosen crew and tier assignments in whatever this run's plan
+  record is, so a reader can see what was chosen and why.
+
+This keeps the balancer usable out of the box — a team that never touches the config still gets
+sensible tiering — while leaving the door open for an operator who wants explicit control over
+cost and capability per role.
+
 ## The operator-config schema
 
 The balancer never invents priorities. Which model or agent class fills which role, and how many

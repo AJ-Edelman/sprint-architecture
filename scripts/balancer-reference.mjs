@@ -28,6 +28,14 @@
 //   review-queue.json — an array of items currently awaiting review/verification,
 //   i.e. work that has left authoring but hasn't cleared the acceptance spine yet:
 //     [ { "id": "rev-1", "status": "pending" | "in_review" }, ... ]
+//
+// If seats.json is absent, this reference implements the invocation-time default from
+// docs/load-balancer.md ("Invocation: ask once, else default to the invoker's own
+// family"): a real deployment asks the operator once at run start; a script has no one to
+// ask, so it goes straight to the default — a tier per task chosen by anticipated
+// complexity, using the invoking model's own family for each tier (left generic here as
+// placeholders — substitute your own family's actual model names). See
+// DEFAULT_TIER_BY_TASK below.
 
 import { readFileSync } from "node:fs";
 
@@ -44,15 +52,57 @@ function loadJson(path, fallback) {
   }
 }
 
+// Default tier-by-task-complexity map (docs/load-balancer.md, "Invocation"): mechanical
+// work gets the fast/cheap tier, review or diagnosis gets the judgment tier, design or
+// arbitration gets the strongest, most deliberative tier. Extend this map for task types
+// your own setup uses beyond the four illustrated here.
+const DEFAULT_TIER_BY_TASK = {
+  coding: "fast",
+  authoring: "fast",
+  review: "judgment",
+  diagnosis: "judgment",
+  integration: "judgment",
+  design: "deliberation",
+  arbitration: "deliberation",
+};
+const DEFAULT_MAX_SEATS_BY_TIER = { fast: 4, judgment: 2, deliberation: 1 };
+
+// Builds a seats config from the invoking model's own family when the operator hasn't
+// supplied one — one role per distinct task seen in the work queue (or the illustrated
+// default task set, if the queue is itself empty), each staffed at its default tier.
+function defaultSeatsConfig(workQueue) {
+  const tasks = [...new Set(workQueue.map((j) => j.task))];
+  const roles = (tasks.length ? tasks : Object.keys(DEFAULT_TIER_BY_TASK)).map((task) => {
+    const tier = DEFAULT_TIER_BY_TASK[task] ?? "fast";
+    return {
+      task,
+      model: `<invoking-model-family:${tier}>`,
+      maxSeats: DEFAULT_MAX_SEATS_BY_TIER[tier],
+      effort: tier,
+    };
+  });
+  return { ceiling: 8, spineCapacity: 6, roles };
+}
+
 const [seatsPath, workQueuePath, reviewQueuePath] = [
   process.argv[2] || "seats.json",
   process.argv[3] || "work-queue.json",
   process.argv[4] || "review-queue.json",
 ];
 
-const seatsConfig = loadJson(seatsPath);
 const workQueue = loadJson(workQueuePath, []);
 const reviewQueue = loadJson(reviewQueuePath, []);
+
+let seatsConfig;
+try {
+  seatsConfig = loadJson(seatsPath);
+} catch {
+  seatsConfig = defaultSeatsConfig(workQueue);
+  console.log(
+    `(no operator config at ${seatsPath} — defaulting to the invoking model's own family, ` +
+      `tiers assigned by anticipated task complexity; see docs/load-balancer.md "Invocation")`
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 2. Derive the numbers the balancing formula needs
