@@ -93,14 +93,50 @@ One file per sprint, containing:
 dependency, or a real precondition nothing can fabricate around — always cited). Faking a pass
 around a genuine block is the worst failure this pattern is built to prevent.
 
-## 2. The shared channel + the dashboard
+## 2. The sentinel record (single source of truth)
+
+The plan document (§1) stays authoritative for its own sprint's item-by-item state; that
+doesn't change. A separate need shows up once a *named, shared fact class* — completed work,
+open blockers, human-action items, deploy receipts, which agents are alive — has to read
+identically across more than one sprint, dashboard, or chat-facing agent at once (multiple
+read-only views of the same per-sprint files don't by themselves trigger this). For those named
+fact classes, add a durable, cross-sprint record that every relevant surface reads from. See
+[`docs/single-source-of-truth.md`](docs/single-source-of-truth.md) for the full pattern;
+summarized:
+
+- **One running record** for the specific fact classes more than one surface must agree on —
+  not a wholesale replacement for the per-sprint plan document.
+- **Sentinel-administered**: exactly one writer process owns the record. Every other agent
+  SUBMITS a fact with provenance (who, evidence pointer, receipt) rather than writing directly,
+  pointing back to the originating sprint's own status table/ledger row as its evidence; the
+  sentinel validates before recording, and rejects rather than silently drops or accepts a
+  submission that fails validation.
+- **Append-only**: corrections are superseding rows, never in-place edits.
+- **Everyone pulls**: dashboards, chat-facing agents, and reporters render from the record at
+  request time for those fact classes; none of them keep a private cached tally.
+- **One voice**: every outbound human-facing message is *reserved* in the same record (an
+  idempotency-keyed outbox entry) before it's dispatched, not just logged afterward — that
+  ordering is what actually prevents two agents, or a retry, from sending a duplicate or
+  conflicting message; logging alone doesn't.
+- **Interim mode**: before the dedicated writer process exists, use one designated interim file
+  per fact class with exactly one responsible writer — not several hand-scripts writing the same
+  file — and hold the rules that matter: provenance on every entry (reviewed manually if nothing
+  validates it automatically yet), no second hand-maintained copy, and every surface reads at
+  request time rather than caching. Any append-only store works underneath (SQLite with
+  write-ahead logging, JSON-lines, a managed database with an audit table) — the discipline is
+  what matters, not the storage engine.
+
+## 3. The shared channel + the dashboard
 
 - The coordination channel carries **signals only** — charter, assignments, receipts, blockers,
   escalations, milestones. Anything longer lives on disk and gets linked, not pasted.
 - **Transport is pluggable.** Prefer a durable, already-adopted channel your team uses; fall back
   to a local/ephemeral one if nothing durable is available. The channel is *never* the only copy
   of the truth and *never* a correctness dependency — the floor keeps functioning if the channel
-  goes down, because the plan document and ledger are what actually matter.
+  goes down, because the plan document and ledger (or the sentinel record, §2) are what actually
+  matter. Some teams run the channel on two platforms at once for redundancy and audience reach —
+  see [`docs/transport-setup.md`](docs/transport-setup.md) for a worked example (Discord and
+  Slack), including bot-token REST posting and threads for deliberations.
 - **Presence**: track last-seen per participant. An agent unaddressed too long is marked *away*,
   visibly, in both the live view and the transcript. Whoever holds the Helm/Seam class is
   prodded on any drop and decides: resume the agent *with its context intact* (never restart
@@ -114,7 +150,7 @@ around a genuine block is the worst failure this pattern is built to prevent.
   shared channel. Verify it's actually reachable from the vantage point the requester will use
   before reporting that it exists.
 
-## 3. Laws that bind every sprint
+## 4. Laws that bind every sprint
 
 - **No time-based anything.** Sequence on completion events, not schedules. Retry backoff is
   short and bounded, used only as an event-detection mechanism — never a scheduling primitive.
@@ -138,7 +174,7 @@ around a genuine block is the worst failure this pattern is built to prevent.
   rate-limited capacity for judgment calls; send volume/mechanical work to fixed-cost or
   high-throughput seats.
 
-## 4. Sequencing and scaling
+## 5. Sequencing and scaling
 
 Fan out everything independent, in parallel, immediately. Chain dependent phases on
 **completion events** from the phase before them — never on a schedule. Backfill any seat that
@@ -146,7 +182,7 @@ frees up while backlog remains, within whatever cap is in force. When a parked o
 needs to resume, resume it with its context intact rather than starting a fresh one from
 scratch.
 
-## 5. Finish + retro (mandatory)
+## 6. Finish + retro (mandatory)
 
 A sprint is finished when every item is landed-and-verified or honest-blocked-with-citation, a
 full verification sweep has run, and one summary has gone back to whoever asked for the

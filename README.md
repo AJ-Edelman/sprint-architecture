@@ -103,6 +103,36 @@ the next person to look at the row can trust it either way.
 
 ---
 
+## Single source of truth: the sentinel record
+
+The two per-sprint documents above remain the authority for that one sprint's own
+item-by-item state — nothing above changes that. A separate need shows up once a *named,
+shared fact class* — completed work, open blockers, deploy receipts, which agents are
+alive — has to read the same way from more than one sprint, more than one dashboard, and
+more than one chat-facing agent at once. Multiple read-only views rendering the same
+per-sprint files are fine on their own; the new layer is only for facts that must be
+canonical *across* sprints and surfaces, not triggered by the mere existence of a second
+viewer.
+
+For those named fact classes, the architecture adds a durable, cross-sprint record
+administered by exactly one writer process (the **sentinel**), which every other agent
+submits facts to — with provenance (who, evidence pointer, receipt) — rather than writing
+directly; each entry points back to the originating sprint's own status table/ledger as
+its evidence. The record is append-only: corrections are superseding rows, never edits.
+Every surface that reports one of these fact classes renders from this record at request
+time instead of keeping its own cached belief, which is what actually prevents two
+surfaces from telling a person two different things. Outbound human-facing messages are
+reserved and logged into the same record as "outbox" rows *before* dispatch, keyed so a
+retry or a second agent can't fan out a duplicate or conflicting message — not just
+logged after the fact — which is what makes "one voice" hold under concurrency, not the
+logging alone.
+
+Full pattern, including the interim-mode path for teams that haven't stood up the
+dedicated writer process yet, and the specific failure classes it closes:
+[`docs/single-source-of-truth.md`](docs/single-source-of-truth.md).
+
+---
+
 ## The signals-only chatroom
 
 Agents in this pattern share a lightweight coordination channel, but the channel carries
@@ -119,8 +149,16 @@ to avoid. Whether to re-add or record the drop as intentional is a call for whoe
 Helm/Seam class, made deliberately rather than by a timer.
 
 The transport itself is pluggable — a durable hosted channel when one's available, a local
-fallback otherwise — and is explicitly *never* a correctness dependency. Ground truth lives on
-disk; the channel can go down mid-sprint without losing anything that mattered.
+fallback otherwise — and is explicitly *never* a correctness dependency. Ground truth lives in
+the durable, authoritative records described above (the per-sprint files, and the sentinel
+record where one exists) — never in the chat transport itself — so the channel can go down
+mid-sprint without losing anything that mattered. Some teams run the same signals-only pattern
+on more than one hosted platform at once, for redundancy of the *transport* and to reach
+stakeholders on whichever platform they already use; running on two platforms widens where a
+signal can be read, it doesn't by itself guarantee a human notices it, so pair it with whatever
+delivery-confirmation or escalation step your own team relies on. See
+[`docs/transport-setup.md`](docs/transport-setup.md) for a worked example (Discord and Slack)
+covering bot-token REST posting and threads for longer deliberations.
 
 ---
 
@@ -217,13 +255,19 @@ real backlogs. See [`docs/failure-classes.md`](docs/failure-classes.md) for the 
 mechanical coordination broke down — and why a thin, judgment-holding coordinator that reads
 every diff outperformed a more "automated" system that didn't.
 
-Two more short notes cover the remaining pieces of the architecture in more depth:
+A few more short notes cover the remaining pieces of the architecture in more depth:
 
 - [`docs/presence-and-chair.md`](docs/presence-and-chair.md) — how the floor tracks who's
   actually working versus silently stalled, and why a person (or a designated "chair" role)
   decides what to do about it instead of a timer.
 - [`docs/event-driven-sequencing.md`](docs/event-driven-sequencing.md) — the sequencing rules
   in full: why nothing here runs on a clock, and what replaces scheduling.
+- [`docs/single-source-of-truth.md`](docs/single-source-of-truth.md) — the sentinel pattern:
+  a single, provenance-checked, append-only record every surface renders from once more than
+  one sprint or reporting surface needs to agree on the same facts.
+- [`docs/transport-setup.md`](docs/transport-setup.md) — a worked example of running the
+  signals-only coordination channel on two hosted platforms at once (Discord and Slack),
+  including bot-token posting and threaded deliberations.
 
 ## The retro loop
 
