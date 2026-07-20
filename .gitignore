@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node (kept in case this repo grows tooling later)
+node_modules/
+npm-debug.log*
+
+# Env / secrets — never publish these
+.env
+.env.*
+!.env.example
+
+# Scratch
+*.tmp
+.tmp/
