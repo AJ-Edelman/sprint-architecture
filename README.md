@@ -196,11 +196,14 @@ shift, seat completion, or detected bottleneck; and let the operator set only a 
 the balancer works freely, and continuously, beneath it. On usage-metered providers the same
 ceilings double as spend control at no extra mechanism.
 
-On invocation, the driving agent asks the operator exactly one question, once per run — specify
-seat maximums per role, or use defaults? Left at defaults, the crew is drawn from the invoking
-model's own family, with each task assigned a tier (fast, judgment, or deliberation) by its
-anticipated complexity, so the balancer is usable out of the box without ever touching a config
-file.
+On invocation, the driving agent asks the operator exactly one question, once per run — a
+preference for models, families, or seat counts per role, or defaults? The ask never blocks: it
+waits in a short, bounded window (the same event-detection exception class as the bounded retry
+backoff described below) while every family-agnostic setup step runs in the background, and only
+seat spawning waits on the window or an earlier reply. Left at defaults, the crew is drawn from
+the invoking model's own family, with each task assigned a tier (fast, judgment, or deliberation)
+by its anticipated complexity, so the balancer is usable out of the box without ever touching a
+config file or adding latency.
 
 Full pattern, the operator-editable config schema, and a small dependency-free reference
 implementation: [`docs/load-balancer.md`](docs/load-balancer.md) and

@@ -30,12 +30,24 @@
 //     [ { "id": "rev-1", "status": "pending" | "in_review" }, ... ]
 //
 // If seats.json is absent, this reference implements the invocation-time default from
-// docs/load-balancer.md ("Invocation: ask once, else default to the invoker's own
-// family"): a real deployment asks the operator once at run start; a script has no one to
-// ask, so it goes straight to the default — a tier per task chosen by anticipated
-// complexity, using the invoking model's own family for each tier (left generic here as
-// placeholders — substitute your own family's actual model names). See
-// DEFAULT_TIER_BY_TASK below.
+// docs/load-balancer.md ("Invocation: ask once, non-blocking, else default to the
+// invoker's own family"). A real deployment asks the operator once, up front, in a short
+// non-blocking window ("preference for models, families, or seat counts per role,
+// otherwise defaults apply") while unrelated setup proceeds in the background, and only
+// falls back to defaults if nothing comes back before the window closes. This offline
+// script has no one to ask, so it goes straight to that same fallback: a tier per task
+// chosen by anticipated complexity, using the invoking model's own family for each tier.
+//
+// Every model family names its own tiers differently — the point isn't the label, it's
+// the complexity mapping underneath it. Two illustrative (fictional) ladders, each with
+// more granularity than this script needs:
+//   family A: quick-tier / standard-tier / flagship-tier / council-tier
+//   family B: spark-tier / core-tier / prime-tier / synod-tier
+// Both collapse onto the same three complexity buckets this script uses generically below
+// (fast, judgment, deliberation) — a family with extra intermediate tiers of its own can
+// fold its lighter judgment-class model into "judgment" here without losing anything this
+// script cares about. Substitute your own family's actual model names for the
+// "<invoking-model-family:*>" placeholders. See DEFAULT_TIER_BY_TASK below.
 
 import { readFileSync } from "node:fs";
 

@@ -64,21 +64,37 @@ not a better parser — it was removing the unattended step. The coordinator rea
 every diff itself. This is slower per item and is kept anyway, because the failure class it
 removes (silent, undetected data loss) is categorically worse than the time it costs.
 
-## 0. Invocation ask: ask once, else default to the invoker's own family
+## 0. Invocation ask: ask once, non-blocking, else default to the invoker's own family
 
 On invocation, before anything else, the driving agent asks the operator exactly one
-question, once per run: "specify seat maximums per role, or use defaults?"
+question, once per run, phrased to cover every axis an operator might care about:
+"Do you have a preference for specific models, families, or number of seats for
+reviewers, coders, [the roles actually present in this run]? Otherwise defaults apply if
+no response within a short, bounded window."
 
-- **Specified** — that config (the schema in §7) governs for the rest of the run.
-- **Defaults** — the crew is drawn from the invoking model's own family (whatever
-  fast/judgment/deliberation-tier siblings that family provides), and the balancer assigns
-  each task a tier by its anticipated complexity: a fast/cheap tier for mechanical work, a
-  stronger tier for review and diagnosis, and the strongest/deliberative tier for design or
-  arbitration calls.
+- **Specified** (models, families, seat counts — any combination) — that config (the
+  schema in §7) governs for the rest of the run.
+- **Defaults** (no reply within the window) — the crew is drawn from the invoking model's
+  own family. Different model families name their own internal tiers differently — one
+  might call them fast/mid/flagship, another quick/standard/pro — the balancer only cares
+  about the complexity mapping, not the vendor-specific label: a fast/cheap tier for
+  mechanical work, a judgment tier for review and diagnosis, and the strongest,
+  deliberative tier for design or arbitration calls.
+- **Non-blocking mechanic.** The wait never stalls the run: every family-agnostic step
+  proceeds in the background while the window is open — backlog decomposition, the plan
+  document, shared-channel setup, ledger creation, worklist claims. The only thing that
+  waits is seat *spawning*, and it waits for whichever comes first: the window closing, or
+  an operator reply arriving early. Net delay to the run: zero.
+- **Why this doesn't violate "never time-based" (§5).** The window is short, bounded, and
+  gates exactly one decision — the initial spawn — the same exception class as the
+  bounded retry-backoff already permitted for event-detection elsewhere in this pattern.
+  It is not a scheduling primitive: nothing about ongoing sequencing, review, or
+  rebalancing runs on a clock; only the one-time "did an answer arrive yet" check does,
+  and only until the run's first seat needs to spawn.
 - The question is asked once per run, never once per batch or per item.
-- Running unattended with no operator to answer: apply the same default rule and record the
-  chosen crew and tier assignments in the plan document, matching the general
-  autonomous-mode discipline in PARAMETERS above.
+- Running unattended with no operator to answer: apply the same default rule immediately
+  (no need to wait out the window) and record the chosen crew and tier assignments in the
+  plan document, matching the general autonomous-mode discipline in PARAMETERS above.
 
 ## 1. Before anything
 
@@ -170,6 +186,8 @@ summarized:
 
 - **No time-based anything.** Sequence on completion events, not schedules. Retry backoff is
   short and bounded, used only as an event-detection mechanism — never a scheduling primitive.
+  The §0 invocation-ask window is the same bounded class: short, capped, gates only the
+  initial spawn decision, and never governs ongoing sequencing or rebalancing.
 - **No invented ceilings.** Lanes stop for *evidence* of a lost thread (no receipts landing,
   escalation-ladder churn, a claim contradicted by the ledger) — never because a counter crossed
   a round number that merely felt sufficient. Operator caps queue work; they never kill it.

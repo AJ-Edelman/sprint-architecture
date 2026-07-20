@@ -85,27 +85,47 @@ The loop above runs whenever one of these fires — never on a fixed timer:
 - **Bottleneck detection** — landings stall behind review even though seats sit idle: a direct
   signal that spine headroom, not seat count, is the live constraint.
 
-## Invocation: ask once, else default to the invoker's own family
+## Invocation: ask once, non-blocking, else default to the invoker's own family
 
 The config below doesn't have to be supplied up front. On invocation, before anything else, the
-driving agent asks the operator exactly one question, once per run: **"specify seat maximums per
-role, or use defaults?"**
+driving agent asks the operator exactly one question, once per run, broad enough to cover every
+axis an operator might care about:
 
-- **Operator specifies** — the config in the next section governs for the rest of the run.
+> "Do you have a preference for specific models, families, or number of seats for reviewers,
+> coders, [the roles actually present in this run]? Otherwise defaults apply if no response
+> within a short, bounded window."
+
+- **Operator specifies** (models, families, seat counts — any combination) — the config in the
+  next section governs for the rest of the run.
 - **Operator doesn't specify (defaults)** — the crew is drawn from the invoking model's own
-  family: whatever fast/judgment/deliberation-tier siblings that model family provides. The
-  balancer then assigns each task a tier by its anticipated complexity — a fast/cheap tier for
-  mechanical work, a stronger tier for review and diagnosis, and the strongest, most deliberative
-  tier for design or arbitration calls that need it.
+  family. Different model families name their own internal tiers differently — one might call
+  them fast/mid/flagship, another quick/standard/pro — the balancer only cares about the
+  complexity mapping, not the vendor-specific label: a fast/cheap tier for mechanical work, a
+  judgment tier for review and diagnosis, and the strongest, most deliberative tier for design or
+  arbitration calls that need it.
 - The question is asked once per run, never once per batch or once per item — re-asking
   mid-run is its own kind of noise.
 - Running unattended, with no operator available to answer: apply the same default rule
-  automatically and record the chosen crew and tier assignments in whatever this run's plan
-  record is, so a reader can see what was chosen and why.
+  immediately (no need to wait out the window) and record the chosen crew and tier assignments
+  in whatever this run's plan record is, so a reader can see what was chosen and why.
+
+### The ask never blocks the run
+
+The window is short and bounded, and it gates exactly one thing: the *first* seat spawn. Every
+family-agnostic step proceeds in the background while it's open — backlog decomposition, the
+plan document, shared-channel setup, ledger creation, worklist claims. The window closes on
+whichever comes first: an operator reply, or the cap expiring. Net delay added to the run: zero,
+because nothing that could start without an answer was ever waiting on one.
+
+This is deliberately the same exception class as the bounded retry-backoff already used
+elsewhere in this pattern for event-detection (see the main [README](../README.md),
+"Event-driven, never time-based"): short, capped, and never a general scheduling primitive.
+Nothing about ongoing sequencing, review, or rebalancing runs on a clock — only this one,
+one-time "did an answer arrive yet" check does, and only until the first seat needs to spawn.
 
 This keeps the balancer usable out of the box — a team that never touches the config still gets
-sensible tiering — while leaving the door open for an operator who wants explicit control over
-cost and capability per role.
+sensible tiering, with zero added latency — while leaving the door open for an operator who
+wants explicit control over cost and capability per role.
 
 ## The operator-config schema
 
