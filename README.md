@@ -5,7 +5,7 @@ human-legible ground truth, an honest terminal state for blocked work, and a ret
 feeds its own improvement back into the process. Proven across two production sprints on the
 same day: **136 → 145** on a 164-item scoreboard, **zero regressions**, plus a caught-in-the-act
 deploy false-positive and a self-audit that found its own definition-of-done was quietly thin
-in 62% of cases — and fixed the auditing process, not just the count.
+in roughly two-thirds of authored checks — and fixed the auditing process, not just the count.
 
 This document describes the architecture. It is written for an engineering audience evaluating
 whether the pattern is reusable — which it is: every role below is a **class**, not a specific
@@ -180,7 +180,7 @@ verdict by verdict, cited — is now a standing pass, not a one-off.
 ## The deploy trap
 
 Standard deploy verification looked complete: unit tests green, the service health endpoint
-returning 200, the production URL returning 200. Six consecutive deploys passed every one of
+returning 200, the production URL returning 200. Five consecutive deploys passed every one of
 those checks — and every one of them was silently serving stale content at the production root.
 The health endpoint was healthy. The *product* wasn't there.
 
