@@ -61,6 +61,16 @@ human helm—must own an executable queue:
 4. On either terminal event, release the author slot and immediately evaluate the next
    non-conflicting item. Review/integration are separate queue items.
 
+### Durable event handling
+
+Run the controller's direct persistent watch command under a service manager, never through a
+short-lived wrapper. At boot, reconcile stopped or absent attempt PIDs from the durable queue
+before admitting more work; a queue label is not liveness evidence. An exit event must be retried
+if it collides with a queue lock or transient queue read failure, and only be considered handled
+once its terminal state is durable. A normal author handoff also creates a bounded independent
+review item from its commit, receipt, and check (or records the exact review blocker). That rule
+prevents capacity from draining into unreviewed handoffs.
+
 The concurrent-model limit is a single operator-configured spend guard. Do not evade it by
 arguing whether a lightweight controller is a “seat.” A mediated item launches only through the
 approved mediation wall; missing mediation is an observable blocker, not permission to fall back
