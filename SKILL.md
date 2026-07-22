@@ -246,6 +246,26 @@ schema, and a dependency-free reference script:
   runs more concurrent paid seats than the spine can actually absorb, so cost tracks landable
   throughput rather than however many lanes happen to be idle and willing to generate output.
 
+### 7.1 Dispatch accounting and recovery
+
+Configured capacity is not actual throughput. The ledger holds an immutable attempt record per
+assignment (attempt ID, item, role/provider, state, process/log evidence, owned paths, check,
+receipt, commit SHA, next event, and failure reason). States are `requested → admitted →
+session_started → working → ready_for_review → integrating → completed`; a pre-session exit is
+`exit_failed` and immediately requeued. Never infer a seat cap from empty logs.
+
+Count only `working` bounded acceptance units as active author capacity. Exclude wrappers,
+monitors, mediators, failed exits, and authors awaiting review after a recoverable commit. An
+author releases its seat at `ready_for_review`; review/integration/requester-vantage acceptance
+are distinct items. With independent queued work and a free authorized author slot, dispatch on
+the completion/exit/verdict event or record the precise blocker.
+
+For floors above three lanes, use a lightweight coordinator/sentinel to administer this record;
+it is not an author seat. Keep judgment capacity for review/fixes. Use isolated worktrees for
+bounded owned paths when the shared checkout is dirty. Authorized mediated external models can
+author typed implementation packets, but a local applier and independent verifier remain
+responsible for isolated application and landing. See [dispatch accounting](docs/dispatch-accounting.md).
+
 ## 8. Finish + retro (mandatory)
 
 A sprint is finished when every item is landed-and-verified or honest-blocked-with-citation, a
