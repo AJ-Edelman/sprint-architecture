@@ -69,7 +69,9 @@ before admitting more work; a queue label is not liveness evidence. An exit even
 if it collides with a queue lock or transient queue read failure, and only be considered handled
 once its terminal state is durable. A normal author handoff also creates a bounded independent
 review item from its commit, receipt, and check (or records the exact review blocker). That rule
-prevents capacity from draining into unreviewed handoffs.
+prevents capacity from draining into unreviewed handoffs. Worker-side handoff commands submit
+state only; only the supervised controller admits work, so a child cannot be orphaned outside the
+process that records its exit.
 
 The concurrent-model limit is a single operator-configured spend guard. Do not evade it by
 arguing whether a lightweight controller is a “seat.” A mediated item launches only through the
