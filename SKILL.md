@@ -266,6 +266,20 @@ bounded owned paths when the shared checkout is dirty. Authorized mediated exter
 author typed implementation packets, but a local applier and independent verifier remain
 responsible for isolated application and landing. See [dispatch accounting](docs/dispatch-accounting.md).
 
+### 7.2 Executable controller requirement
+
+A monitor instructed to “backfill” is not a dispatcher. The floor needs a durable controller that
+materializes every eligible cited plan row into bounded, conflict-safe queue items before the first
+wave; atomically records `requested → admitted → session_started → working`; injects each attempt
+ID into its worker; and requires `ready_for_review` with commit, receipt, and check before normal
+exit. Unexpected exit is `exit_failed` and requeues. Terminal events release author capacity and
+trigger the next dispatch decision without a helm choosing a lane. The configured concurrent-model
+limit is the spend guard; a mediated item may launch only through its approved wall.
+
+Certify the controller using three event observations: live admission, live session-start/working,
+and live terminal handoff or exit followed by automatic release and dispatch decision. Dry-runs
+validate controller code but do not certify a sprint floor.
+
 ## 8. Finish + retro (mandatory)
 
 A sprint is finished when every item is landed-and-verified or honest-blocked-with-citation, a

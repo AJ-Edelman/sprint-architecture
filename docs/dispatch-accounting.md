@@ -45,3 +45,27 @@ not an author seat. Use worktrees for bounded paths if the main checkout is dirt
 external coding models return a typed implementation packet (owned paths, patch/artifact, test,
 receipt); a local applier uses it only in an isolated worktree and an independent verifier decides
 whether it lands. Raw external output is never unattended-applied to the shared checkout.
+
+## A controller, not a reminder
+
+Telling a monitor or language model to “backfill” is not enough. A durable controller—not a
+human helm—must own an executable queue:
+
+1. Materialize every eligible cited plan row into a bounded queue item before the first wave,
+   with a conservative ownership family, acceptance event, and next event. A queue with only its
+   initial manual wave will drain and put backfill back on the helm.
+2. Atomically reserve and record `requested → admitted → session_started → working` with PID/log
+   evidence. Inject the immutable attempt ID into the worker.
+3. Require `ready_for_review` with a commit SHA, receipt, and check before normal worker exit.
+   Unexpected exit becomes `exit_failed` with a requeue record.
+4. On either terminal event, release the author slot and immediately evaluate the next
+   non-conflicting item. Review/integration are separate queue items.
+
+The concurrent-model limit is a single operator-configured spend guard. Do not evade it by
+arguing whether a lightweight controller is a “seat.” A mediated item launches only through the
+approved mediation wall; missing mediation is an observable blocker, not permission to fall back
+to a direct credential.
+
+Certify with three real event observations—not elapsed time and not dry-runs: one admission, one
+session-start/working record, and one terminal handoff or exit followed by automatic release and
+the next dispatch decision.
